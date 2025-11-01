@@ -102,7 +102,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(
-    `Server accessible on: http://localhost:${PORT} and http://192.168.1.6:${PORT}`
+    `Server accessible on: http://localhost:${PORT} and https://good4itbackend.onrender.com`
   );
 });
 
