@@ -5,7 +5,7 @@ const User = require('../models/User');
 const Friend = require('../models/Friend');
 const FriendRequest = require('../models/FriendRequest');
 
-// Search users by email or phone number
+// Search users by name, email or phone number
 router.get('/search', authenticateToken, async (req, res) => {
   try {
     const { query } = req.query;
@@ -15,6 +15,7 @@ router.get('/search', authenticateToken, async (req, res) => {
 
     const users = await User.find({
       $or: [
+        { fullName: { $regex: query, $options: 'i' } },
         { email: { $regex: query, $options: 'i' } },
         { phoneNumber: { $regex: query, $options: 'i' } }
       ],
@@ -124,7 +125,7 @@ router.get('/list', authenticateToken, async (req, res) => {
   }
 });
 
-// Get pending friend requests
+// Get pending friend requests (received)
 router.get('/requests', authenticateToken, async (req, res) => {
   try {
     const requests = await FriendRequest.find({
@@ -135,6 +136,86 @@ router.get('/requests', authenticateToken, async (req, res) => {
     .sort('-createdAt');
 
     res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get sent friend requests (pending requests sent by user)
+router.get('/requests/sent', authenticateToken, async (req, res) => {
+  try {
+    const requests = await FriendRequest.find({
+      sender: req.user.id,
+      status: 'pending'
+    })
+    .populate('recipient', 'fullName email phoneNumber profilePicture')
+    .sort('-createdAt');
+
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get users from contacts who are using the app
+router.post('/contacts', authenticateToken, async (req, res) => {
+  try {
+    const { phoneNumbers } = req.body;
+    
+    if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
+      return res.status(400).json({ message: 'phoneNumbers array is required' });
+    }
+
+    // Normalize phone numbers (remove spaces, dashes, etc.)
+    const normalizedNumbers = phoneNumbers.map(num => 
+      num.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '')
+    ).filter(num => num.length > 0);
+
+    if (normalizedNumbers.length === 0) {
+      return res.json([]);
+    }
+
+    // Build regex patterns for flexible matching
+    // Match phone numbers that contain any of the normalized numbers (handles different formats)
+    // Create regex strings for MongoDB
+    const phoneMatchConditions = normalizedNumbers.map(num => {
+      // Escape special regex characters
+      const escaped = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match the number anywhere in the phone number field (handles different formats)
+      return { phoneNumber: { $regex: escaped, $options: 'i' } };
+    });
+
+    const users = await User.find({
+      $or: phoneMatchConditions,
+      _id: { $ne: req.user.id }, // Exclude current user
+      phoneNumber: { $exists: true, $ne: null } // Only users with phone numbers
+    }).select('fullName email phoneNumber profilePicture good4itScore');
+
+    // Get existing friends and requests to filter out
+    const existingFriends = await Friend.find({ user: req.user.id });
+    const friendIds = existingFriends.map(f => f.friend.toString());
+    
+    const sentRequests = await FriendRequest.find({
+      sender: req.user.id,
+      status: 'pending'
+    });
+    const sentRequestIds = sentRequests.map(r => r.recipient.toString());
+    
+    const receivedRequests = await FriendRequest.find({
+      recipient: req.user.id,
+      status: 'pending'
+    });
+    const receivedRequestIds = receivedRequests.map(r => r.sender.toString());
+
+    // Filter out users who are already friends or have pending requests
+    const filteredUsers = users.filter(user => {
+      const userId = user._id.toString();
+      return !friendIds.includes(userId) && 
+             !sentRequestIds.includes(userId) && 
+             !receivedRequestIds.includes(userId);
+    });
+
+    res.json(filteredUsers);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
