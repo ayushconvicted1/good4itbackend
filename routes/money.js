@@ -2894,14 +2894,14 @@ router.get("/good4it-score/:userId", authenticateToken, async (req, res) => {
       }),
     ]);
 
-    // Simple scoring algorithm
-    let calculatedScore = 100; // Base score
-    calculatedScore += lendingHistory * 10; // +10 for each successful lending
-    calculatedScore += borrowingHistory * 15; // +15 for each successful repayment
-    calculatedScore -= overdueCount * 5; // -5 for each overdue payment
+    // Simple scoring algorithm (0-100 scale)
+    let calculatedScore = 50; // Base score (middle of 0-100)
+    calculatedScore += lendingHistory * 2; // +2 for each successful lending
+    calculatedScore += borrowingHistory * 3; // +3 for each successful repayment
+    calculatedScore -= overdueCount * 1; // -1 for each overdue payment
 
-    // Ensure score is within bounds
-    calculatedScore = Math.max(0, Math.min(1000, calculatedScore));
+    // Ensure score is within bounds (0-100)
+    calculatedScore = Math.max(0, Math.min(100, calculatedScore));
 
     // Update user's score if it's different
     if (user.good4itScore !== calculatedScore) {

@@ -22,8 +22,8 @@ class Good4ItScoreService {
         throw new Error("User not found");
       }
 
-      const previousScore = user.good4itScore;
-      const newScore = Math.max(0, Math.min(1000, previousScore + scoreChange));
+      const previousScore = user.good4itScore || 50; // Default to 50 (middle of 0-100)
+      const newScore = Math.max(0, Math.min(100, previousScore + scoreChange));
 
       // Update user's score
       user.good4itScore = newScore;
@@ -59,37 +59,37 @@ class Good4ItScoreService {
    */
   static calculateScoreChange(eventType, amount = 0, isLate = false) {
     const scoreChanges = {
-      // Positive events
-      transaction_completed: 50, // Lender completes transaction
-      repayment_completed: 30, // Borrower completes repayment
-      early_repayment: 15, // Borrower repays early
-      forgiveness_given: 20, // Lender forgives debt
-      forgiveness_received: 10, // Borrower receives forgiveness
-      dispute_resolved: 25, // Dispute resolved in favor
+      // Positive events (scaled down for 0-100)
+      transaction_completed: 5, // Lender completes transaction
+      repayment_completed: 3, // Borrower completes repayment
+      early_repayment: 2, // Borrower repays early
+      forgiveness_given: 2, // Lender forgives debt
+      forgiveness_received: 1, // Borrower receives forgiveness
+      dispute_resolved: 3, // Dispute resolved in favor
 
-      // Negative events
-      request_declined: -20, // Lender declines request
-      payment_not_received: -30, // Lender doesn't receive payment
-      false_dispute: -50, // False dispute claim
-      late_repayment: -10, // Late repayment
-      fraudulent_proof: -100, // Uploading fraudulent proof
+      // Negative events (scaled down for 0-100)
+      request_declined: -2, // Lender declines request
+      payment_not_received: -3, // Lender doesn't receive payment
+      false_dispute: -5, // False dispute claim
+      late_repayment: -1, // Late repayment
+      fraudulent_proof: -10, // Uploading fraudulent proof
 
       // Account events
-      account_created: 100, // Initial score
+      account_created: 50, // Initial score (middle of 0-100)
       manual_adjustment: 0, // Will be set manually
     };
 
     let change = scoreChanges[eventType] || 0;
 
-    // Adjust for amount-based scoring (optional)
+    // Adjust for amount-based scoring (optional, scaled for 0-100)
     if (amount > 0) {
-      const amountMultiplier = Math.min(amount / 1000, 2); // Cap at 2x multiplier
+      const amountMultiplier = Math.min(amount / 1000, 1.5); // Cap at 1.5x multiplier
       change = Math.round(change * amountMultiplier);
     }
 
     // Additional penalty for late payments
     if (isLate && eventType === "repayment_completed") {
-      change -= 10;
+      change -= 1;
     }
 
     return change;
